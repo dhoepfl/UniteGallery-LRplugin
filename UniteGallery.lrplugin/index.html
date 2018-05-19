@@ -1,0 +1,65 @@
+<? local LrPathUtils = import "LrPathUtils" ?>
+<!DOCTYPE html>
+<html>
+<head>
+   <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+   <title><%= _.title %></title>
+
+   <script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js'></script>
+   <script type='text/javascript' src='unitegallery/js/unitegallery.min.js'></script>
+
+   <link rel='stylesheet' href='unitegallery/css/unite-gallery.css' type='text/css' />
+   <script type='text/javascript' src='unitegallery/themes/default/ug-theme-default.js'></script>
+   <script type='text/javascript' src='unitegallery/themes/tiles/ug-theme-tiles.js'></script>
+
+   <link rel="stylesheet" type="text/css" href="custom.css">
+</head>
+<body>
+   <div id='header'>
+      <div id='info'>
+<? if _.creator_enabled then ?>
+         <p id='creator'><a href="<%= _.creator_url %>"><%= _.creator_title %></a></p>
+<?- end ?>
+<? if _.other_link_enabled then ?>
+         <p id='link'><a href="<%= _.other_link_url %>"><%= _.other_link_title %></a></p>
+<?- end ?>
+      </div>
+      <h1><%= _.title %></h1>
+
+      <span id='headerend'></span>
+   </div>
+
+   <div id='content'>
+      <div id='gallery'>
+<? for _, item in ipairs(_.files) do ?>
+   <? local filename = item[1] ?>
+   <? local photo = item[2] ?>
+   <? if photo:getRawMetadata("isVideo") then ?>
+         <img alt="<%= filename %>"
+              src="images/preview/<%= LrPathUtils.replaceExtension( filename, "jpg" ) %>"
+              data-type="html5video"
+              data-image="images/preview/<%= filename .. ".jpg" %>"
+              data-videomp4="images/original/<%= filename %>"
+              data-description="<%= filename %>">
+
+   <? else ?>
+         <img alt="<%= filename %>"
+              src="images/preview/<%= LrPathUtils.replaceExtension( filename, "jpg" ) %>"
+              data-image="images/original/<%= LrPathUtils.replaceExtension( filename, "jpg" ) %>"
+              data-description="<%= filename %>">
+   <? end -?>
+<? end ?>
+      </div>
+   </div>
+
+   <script type="text/javascript">
+      jQuery(document).ready(function(){
+         jQuery("#gallery").unitegallery({
+                                         gallery_theme: "tiles",
+                                         tiles_type: "justified",
+                                         tile_enable_icons: true,			//enable icons in mouseover mode
+         });
+      });
+   </script>
+</body>
+</html>
