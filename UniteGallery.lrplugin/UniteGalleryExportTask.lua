@@ -95,20 +95,29 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
                local videoPreviewDone = false
                local videoPreview = nil
                local videoPreviewBig = nil
+
+               local requestTask = nil
                LrTasks.startAsyncTask(function()
-                     rendition.photo:requestJpegThumbnail( 350, 350, function(jpeg, reason)
+                     requestTask = rendition.photo:requestJpegThumbnail( 350, 350, function(jpeg, reason)
                         videoPreview = jpeg
-                        rendition.photo:requestJpegThumbnail( 2000, 2000, function(jpeg, reason)
+
+                        requestTask = rendition.photo:requestJpegThumbnail( 2000, 2000, function(jpeg, reason)
+
                             videoPreviewBig = jpeg
                             videoPreviewDone = true
+                            requestTask = nil
                          end)
                      end)
                   end)
-               
+
                while not videoPreviewDone do
-                  LrTasks.yield()
+                  if LrTasks.canYield() then
+                     LrTasks.yield()
+                  else
+                     LrTasks.sleep( .1 )
+                  end
                end
-               
+
                if not videoPreview or not videoPreviewBig then
                   table.insert( failures, filename )
                else
