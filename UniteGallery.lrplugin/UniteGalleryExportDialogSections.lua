@@ -48,6 +48,11 @@ local function updateExportStatus( propertyTable )
          message = LOC "$$$/UniteGallery/ExportDialog/Messages/OtherLink=Enter homepage title and URL."
          break
       end
+
+      if propertyTable.original_res_link_enabled and ( propertyTable.original_res_link_title == "" or propertyTable.original_res_link_title == nil) then
+         message = LOC "$$$/UniteGallery/ExportDialog/Messages/OriginalLink=Enter original image link title."
+         break
+      end
    until true
    
    if message then
@@ -73,6 +78,8 @@ function UniteGalleryExportDialogSections.startDialog( propertyTable )
    propertyTable:addObserver( 'other_link_enabled', updateExportStatus )
    propertyTable:addObserver( 'other_link_title', updateExportStatus )
    propertyTable:addObserver( 'other_link_url', updateExportStatus )
+   propertyTable:addObserver( 'original_res_link_enabled', updateExportStatus )
+   propertyTable:addObserver( 'original_res_link_title', updateExportStatus )
    
    updateExportStatus( propertyTable )
    
@@ -206,6 +213,33 @@ function UniteGalleryExportDialogSections.sectionsForTopOfDialog( _, propertyTab
                enabled = bind 'other_link_enabled',
                tooltip = LOC "$$$/UniteGallery/ExportDialog/OtherLinkURL/Tooltip=The URL the additional link points to.",
                immediate = true,
+               fill_horizontal = 1,
+            },
+         },
+
+
+         -- Link to original res image
+         f:row {
+            f:checkbox {
+               title = LOC "$$$/UniteGallery/ExportDialog/IncludeOriginalLink=Include link to original res image",
+               value = bind 'original_res_link_enabled',
+               tooltip = LOC "$$$/UniteGallery/ExportDialog/IncludeOriginalLink/Tooltip=Check to include original resolution versions of the images in the gallery.",
+            },
+         },
+
+         f:row {
+            f:static_text {
+               title = LOC "$$$/UniteGallery/ExportDialog/OriginalLinkTitle=Original Resolution Link Title:",
+               alignment = 'right',
+               enabled = bind 'original_res_link_enabled',
+               width = share 'labelWidth'
+            },
+
+            f:edit_field {
+               value = bind 'original_res_link_title',
+               enabled = bind 'original_res_link_enabled',
+               immediate = true,
+               tooltip = LOC "$$$/UniteGallery/ExportDialog/OriginalLink/Tooltip=The title of the original resolution image link.",
                fill_horizontal = 1,
             },
          },

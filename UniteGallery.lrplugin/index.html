@@ -31,7 +31,7 @@
 
    <div id='content'>
       <div id='gallery'>
-<? for _, item in ipairs(_.files) do ?>
+<? for ____, item in ipairs(_.files) do ?>
    <? local filename = item[1] ?>
    <? local photo = item[2] ?>
    <? if photo:getRawMetadata("isVideo") then ?>
@@ -39,14 +39,24 @@
               src="images/preview/<%= LrPathUtils.replaceExtension( filename, "jpg" ) %>"
               data-type="html5video"
               data-image="images/preview/<%= filename .. ".jpg" %>"
-              data-videomp4="images/original/<%= filename %>"
-              data-description="<%= filename %>">
+              data-videomp4="images/large/<%= filename %>"
+<? if _.original_res_link_enabled then ?>
+              data-description="<a href='images/original/<%= filename %>'><%= _.original_res_link_title %></a>"
+<? else ?>
+              data-description="<%= filename %>"
+<? end ?>
+              >
 
    <? else ?>
          <img alt="<%= filename %>"
               src="images/preview/<%= LrPathUtils.replaceExtension( filename, "jpg" ) %>"
-              data-image="images/original/<%= LrPathUtils.replaceExtension( filename, "jpg" ) %>"
-              data-description="<%= filename %>">
+              data-image="images/large/<%= LrPathUtils.replaceExtension( filename, "jpg" ) %>"
+<? if _.original_res_link_enabled then ?>
+              data-description="<a href='images/original/<%= LrPathUtils.replaceExtension( filename, "jpg" ) %>'><%= _.original_res_link_title %></a>"
+<? else ?>
+              data-description="<%= filename %>"
+<? end ?>
+              >
    <? end -?>
 <? end ?>
       </div>
@@ -57,7 +67,10 @@
          jQuery("#gallery").unitegallery({
                                          gallery_theme: "tiles",
                                          tiles_type: "justified",
-                                         tile_enable_icons: true,			//enable icons in mouseover mode
+                                         tile_enable_icons: true,
+<? if _.original_res_link_enabled then ?>
+                                         lightbox_textpanel_enable_description: true,
+<? end ?>
          });
       });
    </script>

@@ -53,13 +53,17 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
    -- Ensure target directory exists.
    
    local imagesDir = LrPathUtils.child( exportParams.path, "images" )
-   local originalImagesDir = LrPathUtils.child( imagesDir, "original" )
+   local largeImagesDir = LrPathUtils.child( imagesDir, "large" )
    local previewImagesDir = LrPathUtils.child( imagesDir, "preview" )
+   local originalImagesDir = LrPathUtils.child( imagesDir, "original" )
    
    LrFileUtils.createAllDirectories( exportParams.path )
    LrFileUtils.createAllDirectories( imagesDir )
-   LrFileUtils.createAllDirectories( originalImagesDir )
+   LrFileUtils.createAllDirectories( largeImagesDir )
    LrFileUtils.createAllDirectories( previewImagesDir )
+   if exportParams.original_res_link_enabled then
+      LrFileUtils.createAllDirectories( originalImagesDir )
+   end
 
    -- Clear target folder
    for filePath in LrFileUtils.recursiveFiles( imagesDir ) do
@@ -80,7 +84,7 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
       if success then
 
          local filename = LrPathUtils.leafName( pathOrMessage )
-         local targetFilename = LrFileUtils.chooseUniqueFileName( LrPathUtils.child( originalImagesDir, filename ) )
+         local targetFilename = LrFileUtils.chooseUniqueFileName( LrPathUtils.child( largeImagesDir, filename ) )
          filename = LrPathUtils.leafName( targetFilename )
 
          local success = LrFileUtils.copy( pathOrMessage, targetFilename )
@@ -188,7 +192,75 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
                         success = LrFileUtils.move( pathOrMessage, previewFilename )
                      end
                      if success then
-                        createdFiles[ #createdFiles + 1 ] = { filename, rendition.photo }
+                        if exportParams.original_res_link_enabled then
+                           local originalExportSessionSettings = {
+                              LR_export_destinationType = "specificFolder",
+                              LR_export_destinationPathPrefix = exportParams.path,
+                              LR_export_useSubfolder = false,
+                              LR_reimportExportedPhoto = false,
+                              LR_collisionHandling = "rename",
+                              
+                              LR_extensionCase = exportParams.LR_extensionCase,
+                              LR_initialSequenceNumber = exportParams.LR_initialSequenceNumber,
+                              LR_renamingTokensOn = exportParams.LR_renamingTokensOn,
+                              LR_tokenCustomString = exportParams.LR_tokenCustomString,
+                              LR_tokens = exportParams.LR_tokens,
+                              
+                              LR_format = "JPEG",
+                              LR_export_colorSpace = "sRGB",
+                              LR_jpeg_quality = 0.7,
+                              LR_jpeg_useLimitSize = false,
+                              
+                              LR_size_doConstrain = false,
+                              LR_size_doNotEnlarge = true,
+                              LR_size_resizeType = "longEdge",
+                              LR_size_resolution = 72,
+                              LR_size_resolutionUnits = "inch",
+                              LR_size_units = "pixels",
+                              
+                              LR_outputSharpeningOn = true,
+                              LR_outputSharpeningMedia = "screen",
+                              LR_outputSharpeningLevel = 3,
+                              
+                              LR_minimizeEmbeddedMetadata = true,
+                              LR_removeLocationMetadata = false,
+                              LR_embeddedMetadataOption = "copyrightOnly",
+                              
+                              LR_includeVideoFiles = false,    -- Videos are handles separately
+                              
+                              LR_useWatermark = false,
+                              
+                              LR_exportFiltersFromThisPlugin = {},
+                              
+                              LR_cantExportBecause = nil,
+                           }
+                           local originalExportSession = LrExportSession( { photosToExport = { rendition.photo },
+                                                                           exportSettings = originalExportSessionSettings } )
+                           originalExportSession.doExportOnNewTask()
+                           for _, originalRendition in originalExportSession:renditions{ stopIfCanceled = true } do
+                              local success, pathOrMessage = originalRendition:waitForRender()
+                              
+                              -- Check for cancellation again after photo has been rendered.
+                              if progressScope:isCanceled() then break end
+            
+                              if success then
+                                 local originalFilename = LrPathUtils.child( originalImagesDir, filename )
+                                 if pathOrMessage ~= originalFilename then
+                                    LrFileUtils.delete( originalFilename )
+                                    success = LrFileUtils.move( pathOrMessage, originalFilename )
+                                 end
+                                 if success then
+                                    createdFiles[ #createdFiles + 1 ] = { filename, rendition.photo }
+                                 else
+                                    table.insert( failures, filename )
+                                 end
+                              else
+                                 table.insert( failures, filename )
+                              end   -- not success (render preview)
+                           end   -- for (render preview)
+                        else
+                           createdFiles[ #createdFiles + 1 ] = { filename, rendition.photo }
+                        end
                      else
                         table.insert( failures, filename )
                      end
@@ -202,9 +274,9 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
 
          end   -- success (copy)
 
-      end   -- success (render original)
+      end   -- success (render large)
       
-   end   -- for (render originals)
+   end   -- for (render larges)
    
    -- Copy Unite Gallery
    local resources_source = LrPathUtils.child( _PLUGIN.path, "resources" )
@@ -231,6 +303,8 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
       other_link_enabled = exportParams.other_link_enabled,
       other_link_title = exportParams.other_link_title,
       other_link_url = exportParams.other_link_url,
+      original_res_link_enabled = exportParams.original_res_link_enabled,
+      original_res_link_title = exportParams.original_res_link_title,
       files = createdFiles,
    }
    local index_html = template.compile_file( LrPathUtils.child( _PLUGIN.path, 'index.html' ) )

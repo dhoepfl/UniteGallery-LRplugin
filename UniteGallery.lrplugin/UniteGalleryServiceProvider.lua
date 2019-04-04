@@ -42,6 +42,8 @@ return {
       { key = 'other_link_enabled', default = false },
       { key = 'other_link_title', default = LOC "$$$/UniteGallery/Default/OtherLinkTitle=Homepage" },
       { key = 'other_link_url', default = LOC "$$$/UniteGallery/Default/OtherLinkURL=https://example.com/" },
+      { key = 'original_res_link_enabled', default = false },
+      { key = 'original_res_link_title', default = LOC "$$$/UniteGallery/Default/OriginalLinkTitle=Link to full resolution image." },
    },
 
    startDialog = UniteGalleryExportDialogSections.startDialog,
