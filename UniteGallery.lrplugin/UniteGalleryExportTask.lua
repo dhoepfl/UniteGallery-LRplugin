@@ -23,6 +23,10 @@ local LrErrors = import 'LrErrors'
 local LrDialogs = import 'LrDialogs'
 local LrExportSession = import 'LrExportSession'
 local LrTasks = import 'LrTasks'
+local LrLogger = import 'LrLogger'
+local LrPrefs = import 'LrPrefs'
+
+-- Own helper
 local template = require('template')
 
 --============================================================================--
@@ -32,6 +36,34 @@ UniteGalleryExportTask = {}
 --------------------------------------------------------------------------------
 
 function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportContext )
+
+   local log = LrLogger( 'UniteGalleryExportTask' )
+
+   local prefs = LrPrefs.prefsForPlugin()
+   if prefs.logging_method == "logfile" or prefs.logging_method == "print" then
+      if prefs.logging_level == "trace" then
+         log:enable( {
+                        fatal = prefs.logging_method,
+                        error = prefs.logging_method,
+                        warn = prefs.logging_method,
+                        info = prefs.logging_method,
+                        debug = prefs.logging_method,
+                        trace = prefs.logging_method,
+                     } )
+      elseif prefs.logging_level == "info" then
+         log:enable( {
+                        fatal = prefs.logging_method,
+                        error = prefs.logging_method,
+                        warn = prefs.logging_method,
+                        info = prefs.logging_method,
+                     } )
+      elseif prefs.logging_level == "error" then
+         log:enable( {
+                        fatal = prefs.logging_method,
+                        error = prefs.logging_method,
+                     } )
+      end
+   end
 
    -- Make a local reference to the export parameters.
    
@@ -44,6 +76,7 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
    exportParams.LR_collisionHandling = "overwrite"
    local nPhotos = exportSession:countRenditions()
 
+   log:infof( "Starting export of %d photos/videos", nPhotos )
    local progressScope = exportContext:configureProgress {
                   title = nPhotos > 1
                         and LOC( "$$$/UniteGallery/Export/Progress=Exporting ^1 photos into Unite Gallery", nPhotos )
@@ -87,21 +120,27 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
          local targetFilename = LrFileUtils.chooseUniqueFileName( LrPathUtils.child( largeImagesDir, filename ) )
          filename = LrPathUtils.leafName( targetFilename )
 
+         log:infof( "Exporting [%s] ...", filename )
          local success = LrFileUtils.copy( pathOrMessage, targetFilename )
          if not success then
+            log:errorf( "[%s] failed to export, could not copy to [%s]", filename, targetFilename )
             table.insert( failures, filename )
          else
-            if rendition.photo:getRawMetadata("isVideo") then
+            if rendition.photo:getRawMetadata( "isVideo" ) then
                local videoPreviewDone = false
                local videoPreview = nil
                local videoPreviewBig = nil
 
                local requestTask = nil
                LrTasks.startAsyncTask(function()
+                     log:tracef( "[%s] Requesting small video thumbnail.", filename )
                      requestTask = rendition.photo:requestJpegThumbnail( 350, 350, function(jpeg, reason)
+                        log:tracef( "[%s] Got small video thumbnail.", filename )
                         videoPreview = jpeg
 
+                        log:tracef( "[%s] Requesting big video thumbnail.", filename )
                         requestTask = rendition.photo:requestJpegThumbnail( 2000, 2000, function(jpeg, reason)
+                            log:tracef( "[%s] Got big video thumbnail.", filename )
 
                             videoPreviewBig = jpeg
                             videoPreviewDone = true
@@ -110,6 +149,7 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
                      end)
                   end)
 
+               log:tracef( "[%s] Waiting for video thumbnails.", filename )
                while not videoPreviewDone do
                   if LrTasks.canYield() then
                      LrTasks.yield()
@@ -117,8 +157,10 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
                      LrTasks.sleep( .1 )
                   end
                end
+               log:tracef( "[%s] Video thumbnail generation finished.", filename )
 
                if not videoPreview or not videoPreviewBig then
+                  log:errorf( "[%s] failed to export, missing video preview", filename )
                   table.insert( failures, filename )
                else
                   local targetPreview = LrPathUtils.replaceExtension( LrPathUtils.child( previewImagesDir, filename ), "jpg" )
@@ -135,13 +177,17 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
 
                         createdFiles[ #createdFiles + 1 ] = { filename, rendition.photo }
                      else
+                        log:errorf( "[%s] failed to export, failed to write big video preview", filename )
                         table.insert( failures, filename )
                      end
                   else
+                     log:errorf( "[%s] failed to export, failed to write video preview", filename )
                      table.insert( failures, filename )
                   end
                end
             else
+               log:tracef( "[%s] Exporting image thumbnail.", filename )
+
                local previewExportSessionSettings = {
                   LR_export_destinationType = "specificFolder",
                   LR_export_destinationPathPrefix = exportParams.path,
@@ -193,6 +239,7 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
                   
                   -- Check for cancellation again after photo has been rendered.
                   if progressScope:isCanceled() then break end
+                  log:tracef( "[%s] Exported image thumbnail.", filename )
 
                   if success then
                      local previewFilename = LrPathUtils.child( previewImagesDir, filename )
@@ -202,6 +249,8 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
                      end
                      if success then
                         if exportParams.original_res_link_enabled then
+                           log:tracef( "[%s] Exporting full size image.", filename )
+
                            local originalExportSessionSettings = {
                               LR_export_destinationType = "specificFolder",
                               LR_export_destinationPathPrefix = exportParams.path,
@@ -261,9 +310,11 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
                                  if success then
                                     createdFiles[ #createdFiles + 1 ] = { filename, rendition.photo }
                                  else
+                                    log:errorf( "[%s] failed to export, failed to move full size image.", filename )
                                     table.insert( failures, filename )
                                  end
                               else
+                                 log:errorf( "[%s] failed to export, failed to write full size image.", filename )
                                  table.insert( failures, filename )
                               end   -- not success (render preview)
                            end   -- for (render preview)
@@ -271,9 +322,11 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
                            createdFiles[ #createdFiles + 1 ] = { filename, rendition.photo }
                         end
                      else
+                        log:errorf( "[%s] failed to export, failed to move preview image.", filename )
                         table.insert( failures, filename )
                      end
                   else
+                     log:errorf( "[%s] failed to export, failed to write preview image.", filename )
                      table.insert( failures, filename )
                   end   -- not success (render preview)
    
@@ -286,6 +339,8 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
       end   -- success (render large)
       
    end   -- for (render larges)
+
+   log:info( "Copying Unite library" )
    
    -- Copy Unite Gallery
    local resources_source = LrPathUtils.child( _PLUGIN.path, "resources" )
@@ -299,11 +354,13 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
       LrFileUtils.delete( file_target )
       local success, reason = LrFileUtils.copy( filePath, file_target )
       if not success then
+         log:errorf( "Failed to write Unite file [%s].", resources_source )
          table.insert( failures, subpath )
       end
    end
    
    -- Create index.html
+   log:info( "Createing HTML file" )
    local env = {
       title = exportParams.title,
       creator_enabled = exportParams.creator_enabled,
@@ -332,5 +389,7 @@ function UniteGalleryExportTask.processRenderedPhotos( functionContext, exportCo
       end
       LrDialogs.message( message, table.concat( failures, "\n" ) )
    end
+
+   log:infof( "Finished export of %d photos/videos", nPhotos )
    
 end

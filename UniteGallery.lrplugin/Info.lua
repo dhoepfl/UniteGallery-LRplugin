@@ -26,6 +26,9 @@ return {
 
    LrPluginName = LOC "$$$/UniteGallery/PluginName=Unite Gallery",
    LrPluginInfoUrl = "mailto:unite@hoepfl.de",
+   LrPluginInfoProvider = "UniteGalleryPluginManagerInfoProvider.lua",
+
+   LrInitPlugin = "UniteGalleryInitPlugin.lua",
    
    LrExportServiceProvider = {
       title = "Unite Gallery",
@@ -37,6 +40,6 @@ return {
    --    file = 'UniteGalleryServiceProvider.lua',
    -- },
 
-   VERSION = { major=1, minor=1, revision=1, build=0, },
+   VERSION = { major=1, minor=2, revision=0, build=0, },
 
 }

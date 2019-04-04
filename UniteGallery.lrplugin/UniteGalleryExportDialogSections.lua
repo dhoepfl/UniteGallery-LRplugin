@@ -87,9 +87,9 @@ end
 
 -------------------------------------------------------------------------------
 
-function UniteGalleryExportDialogSections.sectionsForTopOfDialog( _, propertyTable )
+function UniteGalleryExportDialogSections.sectionsForTopOfDialog( viewFactory, propertyTable )
 
-   local f = LrView.osFactory()
+   local f = viewFactory
    local bind = LrView.bind
    local share = LrView.share
 
